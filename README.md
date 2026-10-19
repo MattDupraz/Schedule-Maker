@@ -2,6 +2,10 @@
 
 A small local web app for building a weekly schedule and sharing it as an Excel sheet or PNG image.
 
+## Disclaimer
+
+Written using an LLM, run at your own risk.
+
 ## Usage
 
 Open `index.html` in a browser. No server, build step or internet connection is needed.
