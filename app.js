@@ -48,6 +48,7 @@ function defaultState() {
     endHour: 18,
     step: 60,
     showLegend: true,
+    exportTitle: true,
     size: null, // {width, height} in px once the user drags the corner
     theme: defaultTheme(),
     groups: [],
@@ -107,6 +108,7 @@ function normalize(raw) {
     endHour,
     step: [15, 30, 60].includes(raw.step) ? raw.step : d.step,
     showLegend: raw.showLegend !== false,
+    exportTitle: raw.exportTitle !== false,
     size,
     theme,
     groups,
@@ -239,8 +241,13 @@ function render() {
   const { s0, s1 } = range();
   const perStep = state.step / UNIT;
   const lay = layout();
-  const minCol = (lanes) => (state.size ? "0px" : `${8 / lanes}rem`);
-  grid.style.gridTemplateColumns = ["auto", ...lay.days.map((d) => `repeat(${d.lanes}, minmax(${minCol(d.lanes)}, ${1 / d.lanes}fr))`)].join(" ");
+  // Days with overlapping events get wider: 1.5x for two lanes, 2x for three or more.
+  const dayWidth = (lanes) => Math.min(2, 1 + 0.5 * (lanes - 1));
+  const laneTrack = (lanes) => {
+    const w = dayWidth(lanes) / lanes;
+    return `minmax(${state.size ? "0px" : `${8 * w}rem`}, ${w}fr)`;
+  };
+  grid.style.gridTemplateColumns = ["auto", ...lay.days.map((d) => `repeat(${d.lanes}, ${laneTrack(d.lanes)})`)].join(" ");
   grid.style.gridTemplateRows = state.size
     ? `auto repeat(${(s1 - s0) / UNIT}, minmax(0, 1fr))`
     : `auto repeat(${(s1 - s0) / UNIT}, calc(var(--slot-height) / ${perStep}))`;
@@ -352,6 +359,7 @@ function renderSettings() {
   $("#end-hour").value = state.endHour;
   $("#step").value = state.step;
   $("#show-legend").checked = state.showLegend;
+  $("#export-title").checked = state.exportTitle;
 
   const removeButton = (title, onClick) => {
     const b = document.createElement("button");
@@ -666,6 +674,7 @@ async function exportPng() {
   document.activeElement?.blur();
   const sched = $("#schedule");
   sched.classList.add("exporting");
+  sched.classList.toggle("no-title", !state.exportTitle);
   try {
     const url = await htmlToImage.toPng(sched, {
       pixelRatio: 2,
@@ -677,7 +686,7 @@ async function exportPng() {
   } catch (err) {
     alert(`PNG export failed: ${err?.message ?? err}`);
   } finally {
-    sched.classList.remove("exporting");
+    sched.classList.remove("exporting", "no-title");
   }
 }
 
@@ -717,26 +726,30 @@ async function exportExcel() {
     }),
   ];
 
-  ws.mergeCells(1, 1, 1, lay.lastCol);
-  const titleCell = ws.getCell(1, 1);
-  titleCell.value = state.title;
-  titleCell.font = { bold: true, size: 18, color: { argb: argb(theme.text) } };
-  titleCell.alignment = { horizontal: "center", vertical: "middle" };
-  titleCell.fill = fill(theme.background);
-  ws.getRow(1).height = 34;
+  const headerRow = state.exportTitle ? 2 : 1;
+  const firstRow = headerRow + 1; // first time row
+  if (state.exportTitle) {
+    ws.mergeCells(1, 1, 1, lay.lastCol);
+    const titleCell = ws.getCell(1, 1);
+    titleCell.value = state.title;
+    titleCell.font = { bold: true, size: 18, color: { argb: argb(theme.text) } };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    titleCell.fill = fill(theme.background);
+    ws.getRow(1).height = 34;
+  }
 
-  const header = ws.getRow(2);
+  const header = ws.getRow(headerRow);
   header.height = toHeight(measure(".day-head", "height", 40));
   for (let c = 1; c <= lay.lastCol; c++) header.getCell(c).fill = fill(theme.headerBg);
   lay.days.forEach((d, i) => {
-    if (d.lanes > 1) ws.mergeCells(2, d.col, 2, d.col + d.lanes - 1);
+    if (d.lanes > 1) ws.mergeCells(headerRow, d.col, headerRow, d.col + d.lanes - 1);
     const cell = header.getCell(d.col);
     cell.value = state.days[i].name;
     cell.font = { bold: true, size: 14, color: { argb: argb(theme.headerText) } };
     cell.alignment = { horizontal: "center", vertical: "middle" };
   });
 
-  let r = 3;
+  let r = firstRow;
   for (let t = s0; t < s1; t += unit, r++) {
     const row = ws.getRow(r);
     row.height = toHeight((stepPx * unit) / state.step);
@@ -765,8 +778,8 @@ async function exportExcel() {
 
   for (const { block, start, end, lane, span, col } of items) {
     const left = col + lane;
-    const top = 3 + (start - s0) / unit;
-    const bottom = 2 + (end - s0) / unit;
+    const top = firstRow + (start - s0) / unit;
+    const bottom = firstRow - 1 + (end - s0) / unit;
     if (bottom > top || span > 1) ws.mergeCells(top, left, bottom, left + span - 1);
     const color = blockColor(block);
     const font = { color: { argb: argb(contrastText(color)) } };
@@ -782,11 +795,11 @@ async function exportExcel() {
   const legendGroups = state.groups.filter((g) => g.visible);
   if (state.showLegend && legendGroups.length) {
     const row = ws.getRow(r + 1);
-    row.height = 22;
+    row.height = 28;
     legendGroups.forEach((g, i) => {
       const cell = row.getCell(i + 2);
       cell.value = g.name;
-      cell.font = { bold: true, color: { argb: argb(contrastText(g.color)) } };
+      cell.font = { bold: true, size: 13, color: { argb: argb(contrastText(g.color)) } };
       cell.fill = fill(g.color);
       cell.alignment = { horizontal: "center", vertical: "middle" };
     });
@@ -947,6 +960,10 @@ function init() {
   $("#step").addEventListener("change", (e) => {
     state.step = Number(e.target.value);
     update();
+  });
+  $("#export-title").addEventListener("change", (e) => {
+    state.exportTitle = e.target.checked;
+    save();
   });
   $("#show-legend").addEventListener("change", (e) => {
     state.showLegend = e.target.checked;
