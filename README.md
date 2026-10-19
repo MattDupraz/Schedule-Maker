@@ -1,10 +1,12 @@
 # Schedule Maker
 
-A small local web app for building a weekly schedule and sharing it as an Excel sheet or PNG image.
+A simple web app for building a weekly schedule and sharing it as an Excel sheet or PNG image.
+
+Deployed on GitHub Pages: https://mattdupraz.github.io/Schedule-Maker/
 
 ## Disclaimer
 
-Written using an LLM, run at your own risk.
+The majority of the code was written using an LLM, run it at your own risk.
 
 ## Usage
 
