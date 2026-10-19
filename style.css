@@ -291,6 +291,7 @@ input:not([type]), input[type="text"], select {
 .resize-handle:hover { opacity: 1; }
 .exporting .resize-handle { display: none; }
 .exporting.no-title #schedule-title { display: none; }
+.schedule.exporting { border-radius: 0; box-shadow: none; }
 
 /* Settings panel */
 .settings {

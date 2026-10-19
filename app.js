@@ -666,27 +666,57 @@ function setupResize() {
 
 // ---------- Export / import ----------
 
-async function exportPng() {
-  if (!window.htmlToImage) {
-    alert("The image library didn't load. Make sure the lib/ folder is next to index.html.");
-    return;
-  }
+// Renders the schedule as it appears on screen (minus editing controls) to a PNG data URL.
+async function renderImage(pixelRatio) {
+  if (!window.htmlToImage) throw new Error("The image library didn't load. Make sure the lib/ folder is next to index.html.");
   document.activeElement?.blur();
   const sched = $("#schedule");
   sched.classList.add("exporting");
   sched.classList.toggle("no-title", !state.exportTitle);
   try {
-    const url = await htmlToImage.toPng(sched, {
-      pixelRatio: 2,
+    const width = sched.getBoundingClientRect().width;
+    const canvas = await htmlToImage.toCanvas(sched, {
+      pixelRatio: typeof pixelRatio === "function" ? pixelRatio(width) : pixelRatio,
       backgroundColor: state.theme.background,
       skipFonts: true,
       filter: (node) => !node.classList?.contains("resize-handle") && !node.classList?.contains("cell-add"),
     });
+    return { url: canvas.toDataURL("image/png"), width: canvas.width, height: canvas.height };
+  } finally {
+    sched.classList.remove("exporting", "no-title");
+  }
+}
+
+async function exportPng() {
+  try {
+    const { url } = await renderImage(2);
     download(url, `${fileBase()}.png`);
   } catch (err) {
     alert(`PNG export failed: ${err?.message ?? err}`);
-  } finally {
-    sched.classList.remove("exporting", "no-title");
+  }
+}
+
+// A4 landscape, with the schedule scaled to fill the page (inside a margin) at its own proportions.
+async function exportPdf() {
+  if (!window.jspdf) {
+    alert("The PDF library didn't load. Make sure the lib/ folder is next to index.html.");
+    return;
+  }
+  const pageW = 297;
+  const pageH = 210;
+  const margin = 8;
+  try {
+    // Aim for roughly 300 dpi across the printable width.
+    const { url, width, height } = await renderImage((px) => Math.min(5, Math.max(2, 3300 / px)));
+    const scale = Math.min((pageW - 2 * margin) / width, (pageH - 2 * margin) / height);
+    const w = width * scale;
+    const h = height * scale;
+    const pdf = new jspdf.jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    pdf.setProperties({ title: state.title });
+    pdf.addImage(url, "PNG", (pageW - w) / 2, (pageH - h) / 2, w, h, undefined, "FAST");
+    downloadBlob(pdf.output("blob"), `${fileBase()}.pdf`);
+  } catch (err) {
+    alert(`PDF export failed: ${err?.message ?? err}`);
   }
 }
 
@@ -985,6 +1015,7 @@ function init() {
   $("#settings-btn").addEventListener("click", () => setSettingsOpen($("#settings").hidden));
   $("#add-btn").addEventListener("click", () => openDialog(null));
   $("#png-btn").addEventListener("click", exportPng);
+  $("#pdf-btn").addEventListener("click", exportPdf);
   $("#xlsx-btn").addEventListener("click", exportExcel);
   $("#json-btn").addEventListener("click", exportJson);
   $("#import-input").addEventListener("change", importFile);
