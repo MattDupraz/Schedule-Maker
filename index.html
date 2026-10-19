@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Schedule Maker</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="lib/exceljs.min.js" defer></script>
+  <script src="lib/html-to-image.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="toolbar">
+    <span class="brand">Schedule Maker</span>
+    <div class="actions">
+      <button id="add-btn" class="primary">+ Add event</button>
+      <button id="settings-btn" aria-pressed="false">Settings</button>
+      <button id="png-btn">Export PNG</button>
+      <button id="xlsx-btn" title="Can be imported again later">Export Excel</button>
+      <button id="json-btn" title="Editable copy that can be imported again later">Export JSON</button>
+      <label class="button" title="Open a JSON or Excel file exported from Schedule Maker">Import
+        <input type="file" id="import-input" accept=".json,.xlsx,application/json" hidden>
+      </label>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="canvas">
+      <div id="group-bar" class="group-bar"></div>
+      <div id="schedule" class="schedule">
+        <h1 id="schedule-title" contenteditable="true" spellcheck="false"></h1>
+        <div id="grid" class="grid"></div>
+        <div id="legend" class="legend" hidden></div>
+        <div id="resize-handle" class="resize-handle" title="Drag to resize, double-click to reset"></div>
+      </div>
+      <p class="hint">Click an empty cell to add an event, click an event to edit it. Click the title or a day heading to rename it. Drag the bottom-right corner to resize.</p>
+      <p class="hint warning" id="hidden-note"></p>
+    </section>
+
+    <aside id="settings" class="settings" hidden>
+      <h2>Settings</h2>
+      <fieldset>
+        <legend>Hours</legend>
+        <div class="row">
+          <label>From <select id="start-hour"></select></label>
+          <label>To <select id="end-hour"></select></label>
+          <label>Interval
+            <select id="step">
+              <option value="15">15 min</option>
+              <option value="30">30 min</option>
+              <option value="60">1 hour</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Groups</legend>
+        <ul id="group-list" class="edit-list"></ul>
+        <button id="add-group">+ Add group</button>
+        <label class="check"><input type="checkbox" id="show-legend"> Show legend on schedule</label>
+      </fieldset>
+      <fieldset>
+        <legend>Days</legend>
+        <ul id="day-list" class="edit-list"></ul>
+        <button id="add-day">+ Add day</button>
+      </fieldset>
+      <fieldset>
+        <legend>Colors</legend>
+        <div id="theme-fields" class="theme-fields"></div>
+        <button id="reset-theme">Reset colors</button>
+      </fieldset>
+      <button id="reset-btn" class="danger">Clear schedule</button>
+    </aside>
+  </main>
+
+  <dialog id="slot-dialog">
+    <form id="slot-form">
+      <h2 id="dialog-heading">Event</h2>
+      <label>Title <input name="title" required autocomplete="off"></label>
+      <label>Details <input name="subtitle" placeholder="Optional, e.g. room or person" autocomplete="off"></label>
+      <div class="row">
+        <label>Day <select name="day"></select></label>
+        <label>From <select name="start"></select></label>
+        <label>To <select name="end"></select></label>
+      </div>
+      <label>Group <select name="group"></select></label>
+      <div class="color-row" id="color-row">
+        <div id="swatches" class="swatches"></div>
+        <input type="color" name="color" title="Custom color">
+      </div>
+      <p class="error" id="slot-error"></p>
+      <div class="dialog-actions">
+        <button type="button" id="delete-slot" class="danger">Delete</button>
+        <span class="spacer"></span>
+        <button type="button" id="cancel-slot">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
